@@ -284,7 +284,8 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     // Helper method to map Entity to DTO
     private EnrollmentResponse mapToEnrollmentResponse(Enrollment enrollment) {
         Integer totalLessons = lessonRepository.countLessonsByCourseId(enrollment.getCourse().getId());
-        Integer completedLessons = completedLessonRepository.countCompletedLessonsByStudentId(enrollment.getStudent().getId());
+        Integer completedLessons = completedLessonRepository.countCompletedLessonsByStudentIdAndCourseId(enrollment.getStudent().getId(),
+                enrollment.getCourse().getId());
         String trainerFullname = enrollment.getCourse().getTrainer() != null
                 ? enrollment.getCourse().getTrainer().getFullName()
                 : "N/A";
