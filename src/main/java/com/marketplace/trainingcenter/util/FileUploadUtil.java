@@ -18,7 +18,14 @@ public class FileUploadUtil {
     private String uploadDir;
 
     public String saveFile(MultipartFile file) throws IOException {
-        String uniqueFileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+        String originalFilename = file.getOriginalFilename();
+        String fileExtension = "";
+
+        if (originalFilename != null && originalFilename.contains(".")) {
+            fileExtension = originalFilename.substring(originalFilename.lastIndexOf("."));
+        }
+
+        String uniqueFileName = UUID.randomUUID() + fileExtension;
         Path uploadPath = Paths.get(uploadDir);
 
         if (!Files.exists(uploadPath)) {
@@ -28,7 +35,7 @@ public class FileUploadUtil {
         Path filePath = uploadPath.resolve(uniqueFileName);
         Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-        return uploadDir + "/" + uniqueFileName;
+        return  uniqueFileName;
     }
 
     public void deleteFile(String filePath) {

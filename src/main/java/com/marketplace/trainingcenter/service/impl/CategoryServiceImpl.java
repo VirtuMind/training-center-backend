@@ -30,7 +30,6 @@ public class CategoryServiceImpl implements CategoryService {
 
         Category category = Category.builder()
                 .name(categoryRequest.getName())
-                .description(categoryRequest.getDescription())
                 .build();
 
         Category savedCategory = categoryRepository.save(category);
@@ -64,7 +63,6 @@ public class CategoryServiceImpl implements CategoryService {
         }
 
         category.setName(categoryRequest.getName());
-        category.setDescription(categoryRequest.getDescription());
 
         Category updatedCategory = categoryRepository.save(category);
         return mapToCategoryResponse(updatedCategory);
@@ -99,7 +97,6 @@ public class CategoryServiceImpl implements CategoryService {
         return CategoryResponse.builder()
                 .id(category.getId())
                 .name(category.getName())
-                .description(category.getDescription())
                 .createdAt(category.getCreatedAt())
                 .courseCount(category.getCourses().size())
                 .build();

@@ -28,8 +28,6 @@ public class Category {
     @Column(unique = true, nullable = false)
     private String name;
 
-    private String description;
-
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

@@ -3,8 +3,8 @@ package com.marketplace.trainingcenter.controller;
 import com.marketplace.trainingcenter.dto.ApiResponse;
 import com.marketplace.trainingcenter.dto.enrollment.EnrollmentRequest;
 import com.marketplace.trainingcenter.dto.enrollment.EnrollmentResponse;
+import com.marketplace.trainingcenter.dto.enrollment.LessonToggleResult;
 import com.marketplace.trainingcenter.dto.enrollment.StudentProgressResponse;
-import com.marketplace.trainingcenter.model.enums.EnrollmentStatus;
 import com.marketplace.trainingcenter.model.enums.UserRole;
 import com.marketplace.trainingcenter.security.CustomUserDetails;
 import com.marketplace.trainingcenter.service.CourseService;
@@ -12,7 +12,6 @@ import com.marketplace.trainingcenter.service.EnrollmentService;
 import java.lang.Void;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -29,14 +28,14 @@ public class EnrollmentController {
     private final EnrollmentService enrollmentService;
     private final CourseService courseService;
 
-    @PostMapping
+    @PostMapping("/{courseId}")
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<ApiResponse<EnrollmentResponse>> enrollInCourse(
-            @Valid @RequestBody EnrollmentRequest enrollmentRequest,
+            @PathVariable Long courseId,
             @AuthenticationPrincipal CustomUserDetails currentUser) {
         
         EnrollmentResponse enrollmentResponse = enrollmentService.enrollInCourse(
-                enrollmentRequest, currentUser.getId());
+                courseId, currentUser.getId());
                 
         return new ResponseEntity<>(
                 ApiResponse.success("Enrolled in course successfully", enrollmentResponse),
@@ -83,23 +82,10 @@ public class EnrollmentController {
         );
     }
     
-    @GetMapping("/student/{studentId}")
+    @GetMapping("/student")
     @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getEnrollmentsByStudentId(
-            @PathVariable Long studentId,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        
-        // Students can only view their own enrollments
-        if (currentUser.getRole() == UserRole.STUDENT && 
-                !studentId.equals(currentUser.getId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.<List<EnrollmentResponse>>builder()
-                            .success(false)
-                            .message("You are not authorized to view these enrollments")
-                            .timestamp(java.time.LocalDateTime.now().toString())
-                            .build());
-        }
-        
+    public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getEnrollmentsByStudentId(@AuthenticationPrincipal CustomUserDetails currentUser) {
+        Long studentId = currentUser.getId();
         List<EnrollmentResponse> enrollments = enrollmentService.getEnrollmentsByStudentId(studentId);
         return new ResponseEntity<>(
                 ApiResponse.success("Enrollments retrieved successfully", enrollments),
@@ -134,9 +120,9 @@ public class EnrollmentController {
         );
     }
     
-    @GetMapping("/my-enrollments")
+    @GetMapping("/progress/student")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getMyEnrollments(
+    public ResponseEntity<ApiResponse<List<EnrollmentResponse>>> getStudentCoursesProgress(
             @AuthenticationPrincipal CustomUserDetails currentUser) {
         
         List<EnrollmentResponse> enrollments = enrollmentService.getEnrollmentsByStudentId(currentUser.getId());
@@ -145,70 +131,22 @@ public class EnrollmentController {
                 HttpStatus.OK
         );
     }
-    
-    @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'STUDENT')")
-    public ResponseEntity<ApiResponse<EnrollmentResponse>> updateEnrollmentStatus(
-            @PathVariable Long id,
-            @RequestParam EnrollmentStatus status,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        
-        EnrollmentResponse enrollment = enrollmentService.getEnrollmentById(id);
-        
-        // Students can only cancel their own enrollments
-        if (currentUser.getRole() == UserRole.STUDENT) {
-            if (!enrollment.getStudentId().equals(currentUser.getId())) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ApiResponse.<EnrollmentResponse>builder()
-                                .success(false)
-                                .message("You are not authorized to modify this enrollment")
-                                .timestamp(java.time.LocalDateTime.now().toString())
-                                .build());
-            }
-            
-            // Students can only cancel enrollments
-            if (status != EnrollmentStatus.CANCELLED) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ApiResponse.<EnrollmentResponse>builder()
-                                .success(false)
-                                .message("Students can only cancel their enrollments")
-                                .timestamp(java.time.LocalDateTime.now().toString())
-                                .build());
-            }
-        }
-        
-        EnrollmentResponse updatedEnrollment = enrollmentService.updateEnrollmentStatus(id, status);
+
+    @GetMapping("/progress/trainer/{trainerId}")
+    @PreAuthorize("hasRole('TRAINER')")
+    public ResponseEntity<ApiResponse<List<StudentProgressResponse>>> getStudentsProgressByTrainer(
+            @PathVariable Long trainerId) {
+        List<StudentProgressResponse> progressList = enrollmentService.getStudentsProgressByTrainer(trainerId);
         return new ResponseEntity<>(
-                ApiResponse.success("Enrollment status updated successfully", updatedEnrollment),
+                ApiResponse.success("Students' progress retrieved successfully", progressList),
                 HttpStatus.OK
         );
-    }
-    
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN')")
-    public ResponseEntity<ApiResponse<?>> deleteEnrollment(
-            @PathVariable Long id,
-            @AuthenticationPrincipal CustomUserDetails currentUser) {
-        
-        EnrollmentResponse enrollment = enrollmentService.getEnrollmentById(id);
-        
-        // Students can only delete their own enrollments
-        if (currentUser.getRole() == UserRole.STUDENT && 
-                !enrollment.getStudentId().equals(currentUser.getId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.<Void>error("FORBIDDEN", "You are not authorized to delete this enrollment"));
-        }
-        
-        enrollmentService.deleteEnrollment(id);
-        return new ResponseEntity<>(
-                ApiResponse.<Void>success("Enrollment deleted successfully", null),
-                HttpStatus.OK
-        );
+
     }
     
     @GetMapping("/progress/{courseId}")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<ApiResponse<StudentProgressResponse>> getMyProgress(
+    public ResponseEntity<ApiResponse<StudentProgressResponse>> getStudentProgress(
             @PathVariable Long courseId,
             @AuthenticationPrincipal CustomUserDetails currentUser) {
         
@@ -270,6 +208,26 @@ public class EnrollmentController {
         EnrollmentResponse enrollment = enrollmentService.getEnrollmentByStudentAndCourse(studentId, courseId);
         return new ResponseEntity<>(
                 ApiResponse.success("Enrollment retrieved successfully", enrollment),
+                HttpStatus.OK
+        );
+    }
+    
+    @PostMapping("/lessons/toggle-completion/{lessonId}")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<ApiResponse<LessonToggleResult>> toggleLessonCompletion(
+            @PathVariable Long lessonId,
+            @AuthenticationPrincipal CustomUserDetails currentUser) {
+
+        Boolean isCompleted = enrollmentService.toggleLessonCompletion(currentUser.getId(), lessonId);
+        
+        String message = isCompleted ? "Lesson marked as completed" : "Lesson marked as not completed";
+
+        LessonToggleResult result = new LessonToggleResult();
+        result.setLessonId(lessonId);
+        result.setCompleted(isCompleted);
+
+        return new ResponseEntity<>(
+                ApiResponse.success(message, result),
                 HttpStatus.OK
         );
     }

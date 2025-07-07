@@ -18,6 +18,4 @@ public class ModuleRequest {
     
     @NotNull(message = "Course ID is required")
     private Long courseId;
-    
-    private Integer orderIndex;
 }

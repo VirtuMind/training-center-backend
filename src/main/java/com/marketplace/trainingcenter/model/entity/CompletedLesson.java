@@ -9,7 +9,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
-@Table(name = "completed_modules", uniqueConstraints = {
+@Table(name = "completed_lessons", uniqueConstraints = {
         @UniqueConstraint(columnNames = {"student_id", "lesson_id"})
 })
 @Getter
@@ -17,7 +17,7 @@ import java.util.Objects;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CompletedModule {
+public class CompletedLesson {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -42,7 +42,7 @@ public class CompletedModule {
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        CompletedModule that = (CompletedModule) o;
+        CompletedLesson that = (CompletedLesson) o;
         return id != null && Objects.equals(id, that.id);
     }
 

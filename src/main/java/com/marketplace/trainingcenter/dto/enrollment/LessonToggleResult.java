@@ -1,4 +1,4 @@
-package com.marketplace.trainingcenter.dto.assessment;
+package com.marketplace.trainingcenter.dto.enrollment;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -9,9 +9,7 @@ import lombok.NoArgsConstructor;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class AnswerResponse {
-
-    private Long id;
-    private String answer;
-    private Boolean correct;
+public class LessonToggleResult {
+    private Long lessonId;
+    private Boolean completed;
 }

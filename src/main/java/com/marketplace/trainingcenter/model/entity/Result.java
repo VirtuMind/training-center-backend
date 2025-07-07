@@ -9,9 +9,7 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
-@Table(name = "results", uniqueConstraints = {
-        @UniqueConstraint(columnNames = {"student_id", "course_id"})
-})
+@Table(name = "results")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -32,10 +30,7 @@ public class Result {
     private Course course;
 
     @Column(nullable = false)
-    private Integer score;
-
-    @Column(name = "completed_at")
-    private LocalDateTime completedAt;
+    private Double score;
 
     @CreationTimestamp
     @Column(updatable = false)

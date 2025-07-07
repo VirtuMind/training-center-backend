@@ -14,9 +14,6 @@ import java.time.LocalDateTime;
 public class ReviewResponse {
 
     private Long id;
-    private Long courseId;
-    private String courseTitle;
-    private Long studentId;
     private String studentName;
     private Integer rating;
     private String comment;

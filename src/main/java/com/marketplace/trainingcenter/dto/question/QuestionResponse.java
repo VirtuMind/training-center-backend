@@ -15,7 +15,6 @@ public class QuestionResponse {
 
     private Long id;
     private String question;
-    private Long courseId;
     private List<AnswerResponse> answers;
     
     @Data

@@ -4,11 +4,11 @@ import com.marketplace.trainingcenter.dto.course.CourseResponse;
 import com.marketplace.trainingcenter.dto.module.ModuleRequest;
 import com.marketplace.trainingcenter.exception.ResourceNotFoundException;
 import com.marketplace.trainingcenter.exception.UnauthorizedException;
-import com.marketplace.trainingcenter.model.entity.CompletedModule;
+import com.marketplace.trainingcenter.model.entity.CompletedLesson;
 import com.marketplace.trainingcenter.model.entity.Course;
 import com.marketplace.trainingcenter.model.entity.Lesson;
 import com.marketplace.trainingcenter.model.entity.Module;
-import com.marketplace.trainingcenter.repository.CompletedModuleRepository;
+import com.marketplace.trainingcenter.repository.CompletedLessonRepository;
 import com.marketplace.trainingcenter.repository.CourseRepository;
 import com.marketplace.trainingcenter.repository.LessonRepository;
 import com.marketplace.trainingcenter.repository.ModuleRepository;
@@ -30,7 +30,7 @@ public class ModuleServiceImpl implements ModuleService {
     private final ModuleRepository moduleRepository;
     private final CourseRepository courseRepository;
     private final LessonRepository lessonRepository;
-    private final CompletedModuleRepository completedModuleRepository;
+    private final CompletedLessonRepository completedLessonRepository;
 
     @Override
     @Transactional
@@ -38,17 +38,9 @@ public class ModuleServiceImpl implements ModuleService {
         Course course = courseRepository.findById(moduleRequest.getCourseId())
                 .orElseThrow(() -> new ResourceNotFoundException("Course", "id", moduleRequest.getCourseId()));
 
-        Integer orderIndex = moduleRequest.getOrderIndex();
-        if (orderIndex == null) {
-            // If no order index is provided, place it at the end
-            Integer maxOrderIndex = moduleRepository.getMaxOrderIndexByCourseId(course.getId());
-            orderIndex = (maxOrderIndex != null) ? maxOrderIndex + 1 : 0;
-        }
-
         Module module = Module.builder()
                 .title(moduleRequest.getTitle())
                 .course(course)
-                .orderIndex(orderIndex)
                 .build();
 
         Module savedModule = moduleRepository.save(module);
@@ -70,7 +62,7 @@ public class ModuleServiceImpl implements ModuleService {
             throw new ResourceNotFoundException("Course", "id", courseId);
         }
 
-        List<Module> modules = moduleRepository.findByCourseIdOrderByOrderIndex(courseId);
+        List<Module> modules = moduleRepository.getModulesByCourseId(courseId);
         
         // If no student ID is provided, just return the modules without completion info
         if (studentId == null) {
@@ -80,13 +72,13 @@ public class ModuleServiceImpl implements ModuleService {
         }
         
         // Get all completed lessons for this student and course
-        List<CompletedModule> completedModules = completedModuleRepository
+        List<CompletedLesson> completedLessons = completedLessonRepository
                 .findByStudentIdAndCourseId(studentId, courseId);
         
         // Create a map of lessonId -> completed status for quick lookup
         Map<Long, Boolean> completionMap = new HashMap<>();
-        for (CompletedModule completedModule : completedModules) {
-            completionMap.put(completedModule.getLesson().getId(), true);
+        for (CompletedLesson completedLesson : completedLessons) {
+            completionMap.put(completedLesson.getLesson().getId(), true);
         }
         
         return modules.stream()
@@ -105,11 +97,6 @@ public class ModuleServiceImpl implements ModuleService {
         }
         
         module.setTitle(moduleRequest.getTitle());
-        
-        // Update order index if provided
-        if (moduleRequest.getOrderIndex() != null) {
-            module.setOrderIndex(moduleRequest.getOrderIndex());
-        }
         
         Module updatedModule = moduleRepository.save(module);
         return mapToModuleResponse(updatedModule, null);
@@ -156,22 +143,21 @@ public class ModuleServiceImpl implements ModuleService {
                     .filter(m -> m.getId().equals(moduleId))
                     .findFirst()
                     .orElseThrow(() -> new ResourceNotFoundException("Module", "id", moduleId));
-            
-            module.setOrderIndex(i);
+
             moduleRepository.save(module);
         }
     }
 
     // Helper methods for mapping entities to DTOs
     private CourseResponse.ModuleResponse mapToModuleResponse(Module module, Long studentId) {
-        List<Lesson> lessons = lessonRepository.findByModuleIdOrderByOrderIndex(module.getId());
+        List<Lesson> lessons = lessonRepository.getLessonsByModuleId(module.getId());
         
         List<CourseResponse.LessonResponse> lessonResponses = new ArrayList<>();
         
         if (studentId != null) {
             // Get completed lessons for this student and module
             for (Lesson lesson : lessons) {
-                boolean completed = completedModuleRepository
+                boolean completed = completedLessonRepository
                         .findByStudentIdAndLessonId(studentId, lesson.getId())
                         .isPresent();
                 
@@ -187,14 +173,13 @@ public class ModuleServiceImpl implements ModuleService {
         return CourseResponse.ModuleResponse.builder()
                 .id(module.getId())
                 .title(module.getTitle())
-                .orderIndex(module.getOrderIndex())
                 .lessons(lessonResponses)
                 .build();
     }
     
     private CourseResponse.ModuleResponse mapToModuleResponseWithCompletionInfo(
             Module module, Map<Long, Boolean> completionMap) {
-        List<Lesson> lessons = lessonRepository.findByModuleIdOrderByOrderIndex(module.getId());
+        List<Lesson> lessons = lessonRepository.getLessonsByModuleId(module.getId());
         
         List<CourseResponse.LessonResponse> lessonResponses = lessons.stream()
                 .map(lesson -> {
@@ -206,7 +191,6 @@ public class ModuleServiceImpl implements ModuleService {
         return CourseResponse.ModuleResponse.builder()
                 .id(module.getId())
                 .title(module.getTitle())
-                .orderIndex(module.getOrderIndex())
                 .lessons(lessonResponses)
                 .build();
     }
@@ -216,8 +200,7 @@ public class ModuleServiceImpl implements ModuleService {
                 .id(lesson.getId())
                 .title(lesson.getTitle())
                 .duration(lesson.getDuration())
-                .video(lesson.getVideo())
-                .orderIndex(lesson.getOrderIndex())
+                .videoUrl(lesson.getVideoUrl())
                 .completed(completed)
                 .build();
     }

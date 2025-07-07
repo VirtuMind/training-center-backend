@@ -4,11 +4,11 @@ import com.marketplace.trainingcenter.dto.course.CourseResponse;
 import com.marketplace.trainingcenter.dto.lesson.LessonRequest;
 import com.marketplace.trainingcenter.exception.ResourceNotFoundException;
 import com.marketplace.trainingcenter.exception.UnauthorizedException;
-import com.marketplace.trainingcenter.model.entity.CompletedModule;
+import com.marketplace.trainingcenter.model.entity.CompletedLesson;
 import com.marketplace.trainingcenter.model.entity.Lesson;
 import com.marketplace.trainingcenter.model.entity.Module;
 import com.marketplace.trainingcenter.model.entity.User;
-import com.marketplace.trainingcenter.repository.CompletedModuleRepository;
+import com.marketplace.trainingcenter.repository.CompletedLessonRepository;
 import com.marketplace.trainingcenter.repository.LessonRepository;
 import com.marketplace.trainingcenter.repository.ModuleRepository;
 import com.marketplace.trainingcenter.repository.UserRepository;
@@ -30,7 +30,7 @@ public class LessonServiceImpl implements LessonService {
     private final LessonRepository lessonRepository;
     private final ModuleRepository moduleRepository;
     private final UserRepository userRepository;
-    private final CompletedModuleRepository completedModuleRepository;
+    private final CompletedLessonRepository completedLessonRepository;
     private final FileUploadUtil fileUploadUtil;
 
     @Override
@@ -39,25 +39,17 @@ public class LessonServiceImpl implements LessonService {
         Module module = moduleRepository.findById(lessonRequest.getModuleId())
                 .orElseThrow(() -> new ResourceNotFoundException("Module", "id", lessonRequest.getModuleId()));
 
-        Integer orderIndex = lessonRequest.getOrderIndex();
-        if (orderIndex == null) {
-            // If no order index is provided, place it at the end
-            Integer maxOrderIndex = lessonRepository.getMaxOrderIndexByModuleId(module.getId());
-            orderIndex = (maxOrderIndex != null) ? maxOrderIndex + 1 : 0;
-        }
 
         Lesson lesson = Lesson.builder()
                 .title(lessonRequest.getTitle())
                 .module(module)
                 .duration(lessonRequest.getDuration())
-                .orderIndex(orderIndex)
                 .build();
 
         // Handle video upload if provided
         if (video != null && !video.isEmpty()) {
             try {
-                String videoPath = fileUploadUtil.saveFile(video);
-                lesson.setVideo(videoPath);
+                lesson.setVideoUrl(fileUploadUtil.saveFile(video));
             } catch (Exception e) {
                 throw new com.marketplace.trainingcenter.exception.BadRequestException(
                         "Failed to upload video: " + e.getMessage());
@@ -75,7 +67,7 @@ public class LessonServiceImpl implements LessonService {
         
         boolean completed = false;
         if (studentId != null) {
-            Optional<CompletedModule> completedModule = completedModuleRepository
+            Optional<CompletedLesson> completedModule = completedLessonRepository
                     .findByStudentIdAndLessonId(studentId, id);
             completed = completedModule.isPresent();
         }
@@ -91,13 +83,13 @@ public class LessonServiceImpl implements LessonService {
             throw new ResourceNotFoundException("Module", "id", moduleId);
         }
 
-        List<Lesson> lessons = lessonRepository.findByModuleIdOrderByOrderIndex(moduleId);
+        List<Lesson> lessons = lessonRepository.getLessonsByModuleId(moduleId);
         
         return lessons.stream()
                 .map(lesson -> {
                     boolean completed = false;
                     if (studentId != null) {
-                        Optional<CompletedModule> completedModule = completedModuleRepository
+                        Optional<CompletedLesson> completedModule = completedLessonRepository
                                 .findByStudentIdAndLessonId(studentId, lesson.getId());
                         completed = completedModule.isPresent();
                     }
@@ -121,22 +113,18 @@ public class LessonServiceImpl implements LessonService {
         if (lessonRequest.getDuration() != null) {
             lesson.setDuration(lessonRequest.getDuration());
         }
-        
-        // Update order index if provided
-        if (lessonRequest.getOrderIndex() != null) {
-            lesson.setOrderIndex(lessonRequest.getOrderIndex());
-        }
+
         
         // Handle video update if provided
         if (video != null && !video.isEmpty()) {
             try {
                 // Delete old video if exists
-                if (lesson.getVideo() != null) {
-                    fileUploadUtil.deleteFile(lesson.getVideo());
+                if (lesson.getVideoUrl() != null) {
+                    fileUploadUtil.deleteFile(lesson.getVideoUrl());
                 }
                 
                 String videoPath = fileUploadUtil.saveFile(video);
-                lesson.setVideo(videoPath);
+                lesson.setVideoUrl(videoPath);
             } catch (Exception e) {
                 throw new com.marketplace.trainingcenter.exception.BadRequestException(
                         "Failed to upload video: " + e.getMessage());
@@ -146,7 +134,7 @@ public class LessonServiceImpl implements LessonService {
         Lesson updatedLesson = lessonRepository.save(lesson);
         
         boolean completed = false;
-        if (updatedLesson.getCompletedModules() != null && !updatedLesson.getCompletedModules().isEmpty()) {
+        if (updatedLesson.getCompletedLessons() != null && !updatedLesson.getCompletedLessons().isEmpty()) {
             completed = true;
         }
         
@@ -159,9 +147,9 @@ public class LessonServiceImpl implements LessonService {
         Lesson lesson = getLessonEntityById(id);
         
         // Delete video file if exists
-        if (lesson.getVideo() != null) {
+        if (lesson.getVideoUrl() != null) {
             try {
-                fileUploadUtil.deleteFile(lesson.getVideo());
+                fileUploadUtil.deleteFile(lesson.getVideoUrl());
             } catch (Exception e) {
                 // Log the error but continue with deletion
                 System.err.println("Failed to delete video file: " + e.getMessage());
@@ -178,16 +166,16 @@ public class LessonServiceImpl implements LessonService {
         User student = userRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", "id", studentId));
         
-        Optional<CompletedModule> existingCompletion = completedModuleRepository
+        Optional<CompletedLesson> existingCompletion = completedLessonRepository
                 .findByStudentIdAndLessonId(studentId, lessonId);
         
         if (existingCompletion.isEmpty()) {
-            CompletedModule completedModule = CompletedModule.builder()
+            CompletedLesson completedModule = CompletedLesson.builder()
                     .student(student)
                     .lesson(lesson)
                     .build();
             
-            completedModuleRepository.save(completedModule);
+            completedLessonRepository.save(completedModule);
         }
     }
 
@@ -198,7 +186,7 @@ public class LessonServiceImpl implements LessonService {
         getLessonEntityById(lessonId);
         
         // Delete the completion record if exists
-        completedModuleRepository.deleteByStudentIdAndLessonId(studentId, lessonId);
+        completedLessonRepository.deleteByStudentIdAndLessonId(studentId, lessonId);
     }
 
     @Override
@@ -235,8 +223,7 @@ public class LessonServiceImpl implements LessonService {
                     .filter(l -> l.getId().equals(lessonId))
                     .findFirst()
                     .orElseThrow(() -> new ResourceNotFoundException("Lesson", "id", lessonId));
-            
-            lesson.setOrderIndex(i);
+
             lessonRepository.save(lesson);
         }
     }
@@ -247,8 +234,7 @@ public class LessonServiceImpl implements LessonService {
                 .id(lesson.getId())
                 .title(lesson.getTitle())
                 .duration(lesson.getDuration())
-                .video(lesson.getVideo())
-                .orderIndex(lesson.getOrderIndex())
+                .videoUrl(lesson.getVideoUrl())
                 .completed(completed)
                 .build();
     }

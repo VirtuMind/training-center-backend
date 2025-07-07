@@ -154,9 +154,7 @@ public class ReviewServiceImpl implements ReviewService {
     private ReviewResponse mapToReviewResponse(Review review) {
         return ReviewResponse.builder()
                 .id(review.getId())
-                .courseId(review.getCourse().getId())
-                .courseTitle(review.getCourse().getTitle())
-                .studentId(review.getStudent().getId())
+                .studentName(review.getStudent().getFullName())
                 .studentName(review.getStudent().getFullName())
                 .rating(review.getRating())
                 .comment(review.getComment())

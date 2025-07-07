@@ -2,15 +2,16 @@ package com.marketplace.trainingcenter.service.impl;
 
 import com.marketplace.trainingcenter.dto.enrollment.EnrollmentRequest;
 import com.marketplace.trainingcenter.dto.enrollment.EnrollmentResponse;
+import com.marketplace.trainingcenter.dto.enrollment.LessonToggleResult;
 import com.marketplace.trainingcenter.dto.enrollment.StudentProgressResponse;
 import com.marketplace.trainingcenter.exception.BadRequestException;
 import com.marketplace.trainingcenter.exception.ResourceAlreadyExistsException;
 import com.marketplace.trainingcenter.exception.ResourceNotFoundException;
-import com.marketplace.trainingcenter.model.entity.CompletedModule;
 import com.marketplace.trainingcenter.model.entity.Course;
 import com.marketplace.trainingcenter.model.entity.Enrollment;
 import com.marketplace.trainingcenter.model.entity.User;
-import com.marketplace.trainingcenter.model.enums.EnrollmentStatus;
+import com.marketplace.trainingcenter.model.entity.CompletedLesson;
+import com.marketplace.trainingcenter.model.entity.Lesson;
 import com.marketplace.trainingcenter.repository.*;
 import com.marketplace.trainingcenter.service.EnrollmentService;
 import lombok.RequiredArgsConstructor;
@@ -28,16 +29,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     private final EnrollmentRepository enrollmentRepository;
     private final CourseRepository courseRepository;
     private final UserRepository userRepository;
-    private final CompletedModuleRepository completedModuleRepository;
+    private final CompletedLessonRepository completedLessonRepository;
     private final LessonRepository lessonRepository;
     private final ResultRepository resultRepository;
 
     @Override
     @Transactional
-    public EnrollmentResponse enrollInCourse(EnrollmentRequest enrollmentRequest, Long studentId) {
+    public EnrollmentResponse enrollInCourse(Long courseId, Long studentId) {
         // Check if course exists
-        Course course = courseRepository.findById(enrollmentRequest.getCourseId())
-                .orElseThrow(() -> new ResourceNotFoundException("Course", "id", enrollmentRequest.getCourseId()));
+        Course course = courseRepository.findById(courseId)
+                .orElseThrow(() -> new ResourceNotFoundException("Course", "id", courseId));
         
         // Check if student exists
         User student = userRepository.findById(studentId)
@@ -45,24 +46,16 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         
         // Check if student is already enrolled in this course
         Optional<Enrollment> existingEnrollment = enrollmentRepository
-                .findByStudentIdAndCourseId(studentId, enrollmentRequest.getCourseId());
-        
+                .findByStudentIdAndCourseId(studentId, courseId);
+
         if (existingEnrollment.isPresent()) {
-            // If enrollment exists but is deleted, reactivate it
-            if (existingEnrollment.get().getStatus() == EnrollmentStatus.CANCELLED) {
-                Enrollment enrollment = existingEnrollment.get();
-                enrollment.setStatus(EnrollmentStatus.ACTIVE);
-                return mapToEnrollmentResponse(enrollmentRepository.save(enrollment));
-            } else {
-                throw new ResourceAlreadyExistsException("Enrollment", "courseId", enrollmentRequest.getCourseId().toString());
-            }
+            throw new ResourceAlreadyExistsException("Enrollment", "courseId", courseId.toString());
         }
         
         // Create new enrollment
         Enrollment enrollment = Enrollment.builder()
                 .student(student)
                 .course(course)
-                .status(EnrollmentStatus.ACTIVE)
                 .build();
         
         Enrollment savedEnrollment = enrollmentRepository.save(enrollment);
@@ -103,19 +96,11 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                 .collect(Collectors.toList());
     }
 
-    @Override
-    @Transactional
-    public EnrollmentResponse updateEnrollmentStatus(Long id, EnrollmentStatus status) {
-        Enrollment enrollment = getEnrollmentEntityById(id);
-        enrollment.setStatus(status);
-        return mapToEnrollmentResponse(enrollmentRepository.save(enrollment));
-    }
 
     @Override
     @Transactional
     public void deleteEnrollment(Long id) {
         Enrollment enrollment = getEnrollmentEntityById(id);
-        enrollment.setStatus(EnrollmentStatus.CANCELLED);
         enrollmentRepository.save(enrollment);
     }
 
@@ -123,7 +108,47 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     @Transactional(readOnly = true)
     public boolean isStudentEnrolledInCourse(Long studentId, Long courseId) {
         Optional<Enrollment> enrollment = enrollmentRepository.findByStudentIdAndCourseId(studentId, courseId);
-        return enrollment.isPresent() && enrollment.get().getStatus() == EnrollmentStatus.ACTIVE;
+        return enrollment.isPresent();
+    }
+
+    @Override
+    @Transactional
+    public Boolean toggleLessonCompletion(Long studentId, Long lessonId) {
+
+        // Check if lesson exists
+        Lesson lesson = lessonRepository.findById(lessonId)
+                .orElseThrow(() -> new ResourceNotFoundException("Lesson", "id", lessonId));
+        
+        // Check if student exists
+        User student = userRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", "id", studentId));
+        
+        // Get the course ID from the lesson's module
+        Long courseId = lesson.getModule().getCourse().getId();
+        
+        // Check if the student is enrolled in the course containing this lesson
+        if (!isStudentEnrolledInCourse(studentId, courseId)) {
+            throw new BadRequestException("Student is not enrolled in the course containing this lesson");
+        }
+        
+        // Check if the completed lesson record already exists
+        Optional<CompletedLesson> existingCompletedLesson = completedLessonRepository
+                .findByStudentIdAndLessonId(studentId, lessonId);
+        
+        if (existingCompletedLesson.isPresent()) {
+            // If it exists, delete it (mark as not completed)
+            completedLessonRepository.deleteByStudentIdAndLessonId(studentId, lessonId);
+            return false; // Lesson is now marked as not completed
+        } else {
+            // If it doesn't exist, create it (mark as completed)
+            CompletedLesson completedLesson = CompletedLesson.builder()
+                    .student(student)
+                    .lesson(lesson)
+                    .build();
+            
+            completedLessonRepository.save(completedLesson);
+            return true; // Lesson is now marked as completed
+        }
     }
 
     @Override
@@ -132,14 +157,11 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         // Check if enrollment exists and is active
         Enrollment enrollment = enrollmentRepository.findByStudentIdAndCourseId(studentId, courseId)
                 .orElseThrow(() -> new ResourceNotFoundException("Enrollment", "studentId and courseId", studentId + ", " + courseId));
-        
-        if (enrollment.getStatus() != EnrollmentStatus.ACTIVE) {
-            throw new BadRequestException("Enrollment is not active");
-        }
+
         
         // Calculate progress
         Integer totalLessons = lessonRepository.countLessonsByCourseId(courseId);
-        Integer completedLessons = completedModuleRepository
+        Integer completedLessons = completedLessonRepository
                 .countCompletedLessonsByStudentIdAndCourseId(studentId, courseId);
         
         double completionPercentage = totalLessons > 0 
@@ -150,16 +172,45 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         Double averageScore = resultRepository.findAverageScoreByStudentIdAndCourseId(studentId, courseId);
         
         return StudentProgressResponse.builder()
-                .enrollmentId(enrollment.getId())
-                .courseId(courseId)
                 .courseTitle(enrollment.getCourse().getTitle())
-                .courseCoverImage(enrollment.getCourse().getCoverImage())
                 .completedLessons(completedLessons)
                 .totalLessons(totalLessons)
                 .completionPercentage(completionPercentage)
-                .status(enrollment.getStatus().name())
                 .averageScore(averageScore)
                 .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<StudentProgressResponse> getStudentsProgressByTrainer(Long trainerId) {
+        List<Enrollment> enrollments = enrollmentRepository.findByTrainerId(trainerId);
+
+        return enrollments.stream()
+                .map(enrollment -> {
+                    Long studentId = enrollment.getStudent().getId();
+                    Long courseId = enrollment.getCourse().getId();
+
+                    Integer totalLessons = lessonRepository.countLessonsByCourseId(courseId);
+                    Integer completedLessons = completedLessonRepository
+                            .countCompletedLessonsByStudentIdAndCourseId(studentId, courseId);
+
+                    double completionPercentage = totalLessons > 0
+                            ? ((double) completedLessons / totalLessons) * 100
+                            : 0.0;
+
+                    Double averageScore = resultRepository.findAverageScoreByStudentIdAndCourseId(studentId, courseId);
+
+                    return StudentProgressResponse.builder()
+                            .studentFullname(enrollment.getStudent().getFullName())
+                            .studentUsername(enrollment.getStudent().getUsername())
+                            .courseTitle(enrollment.getCourse().getTitle())
+                            .completedLessons(completedLessons)
+                            .totalLessons(totalLessons)
+                            .completionPercentage(completionPercentage)
+                            .averageScore(averageScore)
+                            .build();
+                })
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -168,12 +219,11 @@ public class EnrollmentServiceImpl implements EnrollmentService {
         List<Enrollment> enrollments = enrollmentRepository.findByStudentId(studentId);
         
         return enrollments.stream()
-                .filter(e -> e.getStatus() == EnrollmentStatus.ACTIVE)
                 .map(enrollment -> {
                     Long courseId = enrollment.getCourse().getId();
                     
                     Integer totalLessons = lessonRepository.countLessonsByCourseId(courseId);
-                    Integer completedLessons = completedModuleRepository
+                    Integer completedLessons = completedLessonRepository
                             .countCompletedLessonsByStudentIdAndCourseId(studentId, courseId);
                     
                     double completionPercentage = totalLessons > 0 
@@ -183,14 +233,10 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                     Double averageScore = resultRepository.findAverageScoreByStudentIdAndCourseId(studentId, courseId);
                     
                     return StudentProgressResponse.builder()
-                            .enrollmentId(enrollment.getId())
-                            .courseId(courseId)
                             .courseTitle(enrollment.getCourse().getTitle())
-                            .courseCoverImage(enrollment.getCourse().getCoverImage())
                             .completedLessons(completedLessons)
                             .totalLessons(totalLessons)
                             .completionPercentage(completionPercentage)
-                            .status(enrollment.getStatus().name())
                             .averageScore(averageScore)
                             .build();
                 })
@@ -212,7 +258,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             return 0.0;
         }
         
-        Integer completedLessons = completedModuleRepository
+        Integer completedLessons = completedLessonRepository
                 .countCompletedLessonsByStudentIdAndCourseId(studentId, courseId);
         
         return ((double) completedLessons / totalLessons) * 100;
@@ -229,7 +275,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
             return 0.0;
         }
         
-        Integer completedLessons = completedModuleRepository
+        Integer completedLessons = completedLessonRepository
                 .countCompletedLessonsByStudentIdAndCourseId(studentId, courseId);
         
         return ((double) completedLessons / totalLessons) * 100;
@@ -238,26 +284,22 @@ public class EnrollmentServiceImpl implements EnrollmentService {
     // Helper method to map Entity to DTO
     private EnrollmentResponse mapToEnrollmentResponse(Enrollment enrollment) {
         Integer totalLessons = lessonRepository.countLessonsByCourseId(enrollment.getCourse().getId());
-        Integer completedLessons = 0;
-        
-        // Only calculate completed lessons for active enrollments
-        if (enrollment.getStatus() == EnrollmentStatus.ACTIVE) {
-            completedLessons = completedModuleRepository.countCompletedLessonsByStudentIdAndCourseId(
-                    enrollment.getStudent().getId(), enrollment.getCourse().getId());
-        }
-        
-        double progress = totalLessons > 0 ? ((double) completedLessons / totalLessons) * 100 : 0.0;
+        Integer completedLessons = completedLessonRepository.countCompletedLessonsByStudentId(enrollment.getStudent().getId());
+        String trainerFullname = enrollment.getCourse().getTrainer() != null
+                ? enrollment.getCourse().getTrainer().getFullName()
+                : "N/A";
+      double progress = totalLessons > 0 ? Math.round(((double) completedLessons / totalLessons) * 10000) / 100.0 : 0.0;
         
         return EnrollmentResponse.builder()
                 .id(enrollment.getId())
                 .studentId(enrollment.getStudent().getId())
-                .studentName(enrollment.getStudent().getFullName())
+                .studentFullname(enrollment.getStudent().getFullName())
                 .courseId(enrollment.getCourse().getId())
+                .courseCategory(enrollment.getCourse().getCategory().getName())
                 .courseTitle(enrollment.getCourse().getTitle())
-                .courseCoverImage(enrollment.getCourse().getCoverImage())
-                .enrollmentDate(enrollment.getCreatedAt())
-                .status(enrollment.getStatus())
-                .progress(progress)
+                .enrolledAt(enrollment.getCreatedAt())
+                .trainerFullname(trainerFullname)
+                .progressPercentage(progress)
                 .completedLessons(completedLessons)
                 .totalLessons(totalLessons)
                 .build();

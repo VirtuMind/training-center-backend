@@ -1,6 +1,5 @@
 package com.marketplace.trainingcenter.model.entity;
 
-import com.marketplace.trainingcenter.model.enums.EnrollmentStatus;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -31,13 +30,6 @@ public class Enrollment {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
-
-    @Column(name = "enrollment_date", nullable = false)
-    private LocalDateTime enrollmentDate;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private EnrollmentStatus status;
 
     @CreationTimestamp
     @Column(updatable = false)

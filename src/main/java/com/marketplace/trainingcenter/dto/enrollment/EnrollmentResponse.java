@@ -1,6 +1,5 @@
 package com.marketplace.trainingcenter.dto.enrollment;
 
-import com.marketplace.trainingcenter.model.enums.EnrollmentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,13 +15,14 @@ public class EnrollmentResponse {
 
     private Long id;
     private Long studentId;
-    private String studentName;
+    private String studentFullname;
     private Long courseId;
+    private String courseCategory;
     private String courseTitle;
-    private String courseCoverImage;
-    private LocalDateTime enrollmentDate;
-    private EnrollmentStatus status;
-    private Double progress;
-    private Integer completedLessons;
+    private LocalDateTime enrolledAt;
+    private String trainerFullname;
     private Integer totalLessons;
+    private Integer completedLessons;
+    private Double progressPercentage;
+
 }

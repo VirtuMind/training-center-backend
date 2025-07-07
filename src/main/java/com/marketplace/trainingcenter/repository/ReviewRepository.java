@@ -19,8 +19,8 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
     List<Review> findByCourseIdIn(List<Long> courseIds);
     
     Optional<Review> findByStudentIdAndCourseId(Long studentId, Long courseId);
-    
-    @Query("SELECT AVG(r.rating) FROM Review r WHERE r.course.id = :courseId")
+
+    @Query("SELECT COALESCE(AVG(r.rating), 0.0) FROM Review r WHERE r.course.id = :courseId")
     Double getAverageRatingByCourseId(@Param("courseId") Long courseId);
     
     @Query("SELECT AVG(r.rating) FROM Review r WHERE r.course.trainer.id = :trainerId")

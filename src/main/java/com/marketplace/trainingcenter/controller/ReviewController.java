@@ -120,18 +120,7 @@ public class ReviewController {
             @AuthenticationPrincipal CustomUserDetails currentUser) {
         
         ReviewResponse existingReview = reviewService.getReviewById(id);
-        
-        // Students can only update their own reviews
-        if (currentUser.getRole() == UserRole.STUDENT && 
-                !existingReview.getStudentId().equals(currentUser.getId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.<ReviewResponse>builder()
-                            .success(false)
-                            .message("You are not authorized to update this review")
-                            .timestamp(java.time.LocalDateTime.now().toString())
-                            .build());
-        }
-        
+
         ReviewResponse updatedReview = reviewService.updateReview(id, reviewRequest);
         return new ResponseEntity<>(
                 ApiResponse.success("Review updated successfully", updatedReview),
@@ -146,13 +135,7 @@ public class ReviewController {
             @AuthenticationPrincipal CustomUserDetails currentUser) {
         
         ReviewResponse existingReview = reviewService.getReviewById(id);
-        
-        // Students can only delete their own reviews
-        if (currentUser.getRole() == UserRole.STUDENT && 
-                !existingReview.getStudentId().equals(currentUser.getId())) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(ApiResponse.<Void>error("FORBIDDEN", "You are not authorized to delete this review"));
-        }
+
         
         reviewService.deleteReview(id);
         return new ResponseEntity<>(

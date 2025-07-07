@@ -10,13 +10,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StudentProgressResponse {
-    private Long enrollmentId;
-    private Long courseId;
+    private String studentFullname;
+    private String studentUsername;
     private String courseTitle;
-    private String courseCoverImage;
     private Integer completedLessons;
     private Integer totalLessons;
     private Double completionPercentage;
-    private String status;
-    private Double averageScore; // From quiz/assessment results
+    private Double averageScore; // From quiz results
 }

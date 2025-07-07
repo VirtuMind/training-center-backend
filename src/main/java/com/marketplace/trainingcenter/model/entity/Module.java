@@ -33,10 +33,6 @@ public class Module {
     @JoinColumn(name = "course_id", nullable = false)
     private Course course;
 
-    @NotNull(message = "Order index is required")
-    @Column(name = "order_index")
-    private Integer orderIndex;
-
     @CreationTimestamp
     @Column(updatable = false)
     private LocalDateTime createdAt;

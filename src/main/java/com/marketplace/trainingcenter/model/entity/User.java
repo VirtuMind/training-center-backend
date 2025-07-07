@@ -66,7 +66,7 @@ public class User {
     private Set<Review> reviews = new HashSet<>();
 
     @OneToMany(mappedBy = "student")
-    private Set<CompletedModule> completedModules = new HashSet<>();
+    private Set<CompletedLesson> completedLessons = new HashSet<>();
 
     @OneToMany(mappedBy = "student")
     private Set<Result> results = new HashSet<>();

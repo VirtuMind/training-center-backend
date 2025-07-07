@@ -1,6 +1,5 @@
 package com.marketplace.trainingcenter.dto.course;
 
-import com.marketplace.trainingcenter.dto.quiz.QuizRequest;
 import com.marketplace.trainingcenter.model.enums.CourseLevel;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -13,60 +12,32 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
-
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CourseRequest {
-
+public class CourseRequestUpdate {
     @NotBlank(message = "Course title is required")
     private String title;
-    
+
     private String description;
-    
+
     @NotNull(message = "Course level is required")
     private CourseLevel level;
 
     @NotBlank(message = "Course duration is required")
     private String duration;
-    
+
     @NotNull(message = "Category ID is required")
     private Long categoryId;
 
-    @NotNull(message = "Cover image is required")
-    private MultipartFile coverImage;
-    
+    private String coverImageUrl;
+
+    private MultipartFile coverImage; // Optional, can be null if not updating
+
     @NotNull(message = "Module list cannot be null")
     private String modules; // name="modules", holds JSON string
-    
+
     @NotNull(message = "Quiz is required")
     private String quiz;  // name="quiz", holds JSON string
-    
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class ModuleRequest {
-        private Long id; // Null for new modules
-        
-        @NotBlank(message = "Module title is required")
-        private String title;
-        
-        @Valid
-        private List<LessonRequest> lessons = new ArrayList<>();
-    }
-    
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class LessonRequest {
-        private Long id; // Null for new lessons
-        
-        @NotBlank(message = "Lesson title is required")
-        private String title;
-        @NotBlank
-        private String duration;
-    }
 }

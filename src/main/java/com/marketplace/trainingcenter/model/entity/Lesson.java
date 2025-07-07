@@ -35,11 +35,7 @@ public class Lesson {
 
     private String duration;
 
-    private String video;
-
-    @NotNull(message = "Order index is required")
-    @Column(name = "order_index")
-    private Integer orderIndex;
+    private String videoUrl;
 
     @CreationTimestamp
     @Column(updatable = false)
@@ -50,7 +46,7 @@ public class Lesson {
 
     // Relationships
     @OneToMany(mappedBy = "lesson")
-    private Set<CompletedModule> completedModules = new HashSet<>();
+    private Set<CompletedLesson> completedLessons = new HashSet<>();
 
     @Override
     public boolean equals(Object o) {

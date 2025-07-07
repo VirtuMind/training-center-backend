@@ -44,8 +44,7 @@ public class SecurityConfig {
                                 "/api/courses/{id}",
                                 "/api/categories",
                                 "/api/categories/{id}",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**"
+                                "/files/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 );
