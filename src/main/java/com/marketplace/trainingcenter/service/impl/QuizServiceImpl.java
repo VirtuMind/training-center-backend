@@ -3,8 +3,6 @@ package com.marketplace.trainingcenter.service.impl;
 import com.marketplace.trainingcenter.dto.question.QuestionResponse;
 import com.marketplace.trainingcenter.dto.quiz.QuizResponse;
 import com.marketplace.trainingcenter.dto.result.QuizSubmissionRequest;
-import com.marketplace.trainingcenter.dto.result.ResultResponse;
-import com.marketplace.trainingcenter.exception.AccessDeniedException;
 import com.marketplace.trainingcenter.exception.ResourceNotFoundException;
 import com.marketplace.trainingcenter.model.entity.*;
 import com.marketplace.trainingcenter.repository.*;

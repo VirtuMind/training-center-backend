@@ -195,7 +195,7 @@ public class EnrollmentServiceImpl implements EnrollmentService {
                             .countCompletedLessonsByStudentIdAndCourseId(studentId, courseId);
 
                     double completionPercentage = totalLessons > 0
-                            ? ((double) completedLessons / totalLessons) * 100
+                            ? Math.round(((double) completedLessons / totalLessons) * 10000) / 100.0
                             : 0.0;
 
                     Double averageScore = resultRepository.findAverageScoreByStudentIdAndCourseId(studentId, courseId);
